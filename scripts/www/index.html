@@ -1,88 +1,417 @@
 <!DOCTYPE html>
-<html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <link rel="stylesheet" href="./static/css/styles.css" />
-        <meta
-            http-equiv="Content-Security-Policy"
-            content="default-src * 'unsafe-inline' 'unsafe-eval'"
-        />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Tauri App</title>
-        <script src="./static/js/main.js"></script>
-    </head>
-    <body>
-        <main class="container">
-            <h1>Welcome to TauriMan</h1>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>日出日落灯 控制端</title>
+    <style>
+        body{margin:0;padding:0;font-family:sans-serif;background:#f5f6fa;color:#333;}
+        .app-container{max-width:500px;margin:0 auto;padding-bottom:90px;background:#fff;min-height:100vh;}
+        .page{display:none;padding:15px;}.page.active{display:block;}
+        #connection-bar{background:#ff9800;color:#fff;text-align:center;padding:10px;font-size:13px;font-weight:bold;position:sticky;top:0;z-index:100;cursor:pointer;transition:background-color 0.3s;}
+        #connection-bar.connected{background:#00cc00;}#connection-bar.error{background:#f44336;}
+        .title-purple{color:#6600cc;text-align:center;font-size:18px;margin:20px 0;font-weight:bold;}
+        .form-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;font-size:14px;}
+        .input-box{border:1px solid #ccc;border-radius:4px;padding:8px;font-size:14px;text-align:right;width:110px;outline:none;}
+        .btn{border:none;border-radius:6px;text-align:center;font-size:14px;cursor:pointer;}
+        .btn-green{background:#00cc00;color:#fff;padding:12px;font-weight:bold;width:100%;margin-bottom:10px;}
+        .btn-blue{background:#007bff;color:#fff;padding:12px;font-weight:bold;width:100%;margin-bottom:10px;}
+        .btn-white{background:#fff;color:#333;border:1px solid #ccc;padding:10px;flex:1;font-size:13px;}
+        .btn-group{display:flex;justify-content:space-between;gap:8px;margin-bottom:15px;}
+        .switch-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:15px;font-weight:bold;background:#f9f9f9;padding:10px;border-radius:8px;}
+        .toggle-switch{position:relative;width:50px;height:26px;}
+        .toggle-switch input{opacity:0;width:0;height:0;}
+        .slider-bg{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#ccc;transition:.4s;border-radius:26px;}
+        .slider-bg:before{position:absolute;content:"";height:20px;width:20px;left:3px;bottom:3px;background-color:white;transition:.4s;border-radius:50%;}
+        .toggle-switch input:checked+.slider-bg{background-color:#00cc00;}
+        .toggle-switch input:checked+.slider-bg:before{transform:translateX(24px);}
+        .number-control{display:flex;align-items:center;border:1px solid #ccc;border-radius:4px;background:#fff;}
+        .number-control button{background:#eee;border:none;padding:5px 12px;cursor:pointer;font-size:18px;}
+        .number-control span{width:35px;text-align:center;font-size:14px;font-weight:bold;}
+        .slider-row{display:flex;align-items:center;margin-bottom:15px;font-size:13px;}
+        .slider-row label{width:65px;overflow:hidden;text-overflow:ellipsis;}
+        .range-slider{flex:1;margin:0 10px;-webkit-appearance:none;height:10px;border-radius:5px;outline:none;}
+        .range-slider::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;border-radius:50%;background:#fff;border:2px solid #ddd;}
+        .circle-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:15px;margin-bottom:25px;}
+        .circle-item{display:flex;flex-direction:column;align-items:center;font-size:11px;color:#777;}
+        .circle{width:60px;height:60px;border-radius:50%;border:3px solid;display:flex;justify-content:center;align-items:center;font-size:18px;color:#333;margin-top:5px;background:#fff;}
+        .tab-bar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:500px;display:flex;background:#fff;border-top:1px solid #eee;padding:12px 0;z-index:99;}
+        .tab-item{flex:1;text-align:center;color:#888;font-size:14px;cursor:pointer;}
+        .tab-item.active{color:#ff0000;font-weight:bold;}
+        .modal{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:1000;justify-content:center;align-items:center;}
+        .modal-content{background:#fff;width:85%;border-radius:12px;padding:20px;text-align:center;}
+        .small-btn{background:#1e90ff;color:white;border:none;border-radius:4px;padding:6px 12px;font-size:12px;cursor:pointer;margin-left:8px;}
+        .scan-item{padding:10px;border:1px solid #ddd;margin:5px 0;border-radius:5px;cursor:pointer;display:flex;justify-content:space-between;background:#fafafa;}
+        .scan-item:hover{background:#e8f5e9;}
+        input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+        input[type=number]{-moz-appearance:textfield;}
+        .curve-container{background:#fff;border:1px solid #e0e0e0;border-radius:8px;padding:10px;margin-bottom:15px;}
+        .curve-legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:5px;font-size:12px;}
+        .legend-item{display:flex;align-items:center;gap:4px;}
+        .legend-color{width:12px;height:12px;border-radius:2px;}
+    </style>
+</head>
+<body>
+<div class="app-container">
+    <div id="connection-bar" onclick="manualReconnect()">⚡ 未连接</div>
 
-            <div class="row">
-                <a
-                    href="https://tauri.app"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                >
-                    <img
-                        src="./assets/tauri.svg"
-                        class="logo tauri"
-                        alt="Tauri logo"
-                    />
-                </a>
-                <a
-                    href="https://pakeplus.com/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                >
-                    <img
-                        src="https://hk.gh-proxy.org/https://github.com/Sjj1024/PakePlus/blob/main/app-icon.png"
-                        class="logo vanilla"
-                        alt="JavaScript logo"
-                    />
-                </a>
+    <!-- 工作状态 -->
+    <div id="page-status" class="page">
+        <div class="title-purple">工作状态</div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;color:#666;margin-bottom:20px;">
+            <span id="st-mode">自动模式</span><span>--℃</span><span>风扇:--%</span><span id="st-time">--:--</span>
+        </div>
+        <div class="circle-grid" id="status-grid"></div>
+        <button class="btn btn-green" onclick="readFromESP()">读取状态</button>
+    </div>
+
+    <!-- 参数设置 -->
+    <div id="page-params" class="page active">
+        <div class="title-purple">水族灯控制</div>
+        <div class="switch-row">
+            <div style="display:flex;align-items:center;gap:8px">
+                <span id="mode-label">自动模式</span>
+                <label class="toggle-switch"><input type="checkbox" id="auto-mode-toggle" checked onchange="updateMode()"><span class="slider-bg"></span></label>
             </div>
-            <p>Click to get data</p>
-            <form class="row" id="greet-form">
-                <input id="greet-input" placeholder="Enter a name..." />
-                <button type="submit" id="getdata">GET DATA</button>
-            </form>
-            <div class="functions">
-                <a href="./book.html" target="_self">跳转到book.html</a>
-                <a
-                    href="https://www.baidu.com"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    >跳到百度blank
-                </a>
-                <a
-                    href="https://www.baidu.com"
-                    target="_self"
-                    rel="noopener noreferrer"
-                >
-                    跳到百度self
-                </a>
-                <button onclick="sayHello()">点击我</button>
-                <button onclick="sayHello()">下载文件</button>
-                <button onclick="sayHello()">上传文件</button>
-                <button onclick="sayHello()">访问相机</button>
-                <button onclick="sayHello()">访问麦克风</button>
-                <button onclick="sayHello()">访问相册</button>
-                <button class="btn" onclick="openWechat()">打开微信</button>
-                <button class="btn" onclick="openWechatScan()">
-                    打开扫一扫
-                </button>
-                <button class="btn" onclick="openZhihu()">打开知乎</button>
-                <button onclick="sayHello()">打开抖音</button>
-                <button onclick="sayHello()">用浏览器打开</button>
-                <button>打开知乎</button>
+            <div style="display:flex;align-items:center;gap:8px">
+                <span style="color:#1e90ff">时间点 <b id="time-val">12</b>:00</span>
+                <div class="number-control" style="border:none;"><button class="btn-white" onclick="changeTime(-1)">-</button><button class="btn-white" onclick="changeTime(1)">+</button></div>
             </div>
-            <p id="greet-msg"></p>
-            <img src="./static/image/cursor.jpeg" alt="logo" />
-            <video
-                src="https://hk.gh-proxy.org/https://github.com/Sjj1024/PakePlus/blob/main/docs/static/videos/pakeplus.mp4"
-                autoplay
-                controls
-                style="width: 100%; height: 100%"
-            ></video>
-            <audio src="./static/music/yin.mp3" controls></audio>
-        </main>
-    </body>
+        </div>
+
+        <!-- 24小时曲线图 -->
+        <div class="curve-container">
+            <canvas id="curveCanvas" style="width:100%; height:220px; display:block;"></canvas>
+            <div class="curve-legend" id="curveLegend"></div>
+        </div>
+
+        <div class="btn-group">
+            <button class="btn btn-white" onclick="adjustPower(1.1)">功率×1.1</button>
+            <button class="btn btn-white" onclick="adjustPower(0.9)">功率×0.9</button>
+            <button class="btn btn-white" onclick="shiftTime(-1)">时间提前</button>
+            <button class="btn btn-white" onclick="shiftTime(1)">时间推迟</button>
+        </div>
+        <div id="controls-container"></div>
+        <div class="btn-group">
+            <button class="btn btn-green" onclick="sendToESP()">发送数据</button>
+            <button class="btn btn-green" onclick="readFromESP()">读取数据</button>
+        </div>
+        <div class="btn-group">
+            <button class="btn btn-white" onclick="showModal('load')">加载模式数据</button>
+            <button class="btn btn-white" onclick="showModal('save')">保存模式数据</button>
+        </div>
+    </div>
+
+    <!-- 系统设置 -->
+    <div id="page-system" class="page">
+        <div class="title-purple">系统设置</div>
+        <div class="form-row"><span>手机当前IP:</span><div style="display:flex;gap:8px"><span id="local-ip-display">获取中...</span><button class="btn small-btn" style="background:#1e90ff;color:#fff" onclick="refreshLocalIP()">刷新</button></div></div>
+        <!-- 新增提示文字 -->
+        <div style="font-size:12px; color:#888; margin-bottom:10px; padding-left:2px;">
+            💡 切换WIFI/移动网络后，请退出软件重新打开，即可获取正确IP
+        </div>
+        <div class="form-row"><span>设备 IP:</span><input type="text" class="input-box" id="device-ip" value="192.168.4.1" style="width:140px;"></div>
+        <div style="display:flex;gap:10px;margin:10px 0"><button class="btn btn-green" style="flex:1" onclick="scanDevices()">扫描设备</button><button class="btn btn-green" style="flex:1" onclick="manualConnect()">连接设备</button></div>
+        <div id="scan-result" style="margin-bottom:10px"></div>
+        <div class="form-row"><span>风扇启动温度(℃)</span><input type="number" id="sys-fan-temp" class="input-box" value="38"></div>
+        <div class="form-row"><span>风扇启动转速(%)</span><input type="number" id="sys-fan-speed" class="input-box" value="50"></div>
+        <div class="form-row"><span>热保护启动温度(℃)</span><input type="number" id="sys-prot-temp" class="input-box" value="58"></div>
+        <div class="form-row"><span>通道数量(1-10)</span><div style="display:flex;gap:8px"><input type="text" id="ch-count-input" class="input-box" value="8" style="width:50px;text-align:center"><button class="btn small-btn" style="background:#00cc00;color:#fff" onclick="applyChannelSettings()">保存</button></div></div>
+        <div id="channel-name-inputs" style="margin-bottom:15px"></div>
+        <button class="btn btn-blue" onclick="saveToPhoneLocal()">💾 保存到手机</button>
+        <button class="btn btn-green" onclick="sendSystemData()">📤 发送数据并校时</button>
+        <div class="title-purple" style="margin-top:20px">路由器设置</div>
+        <div class="form-row"><span>SSID:</span><input type="text" id="wifi-ssid" class="input-box" placeholder="路由器名称"></div>
+        <div class="form-row"><span>密码:</span><input type="text" id="wifi-pwd" class="input-box" style="border:2px solid #000" placeholder="WiFi密码"></div>
+        <button class="btn btn-green" onclick="sendRouterConfig()">🔗 发送路由信息并连接</button>
+    </div>
+</div>
+
+<div class="tab-bar">
+    <div class="tab-item" onclick="nav('status',this)">工作状态</div>
+    <div class="tab-item active" onclick="nav('params',this)">参数设置</div>
+    <div class="tab-item" onclick="nav('system',this)">系统设置</div>
+</div>
+
+<div class="modal" id="mode-modal">
+    <div class="modal-content">
+        <div id="modal-btns-preset" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:15px"></div>
+        <div id="modal-btns-custom" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"></div>
+        <button class="btn btn-white" style="width:100%;margin-top:20px;color:red;border-color:red" onclick="closeModal()">取消</button>
+    </div>
+</div>
+
+<script>
+// ===== 强制清理旧数据，确保初始值为0 =====
+(function(){
+    let saved = localStorage.getItem('aq_state');
+    if (saved) { try { let temp = JSON.parse(saved); if (temp.schedule && temp.chCount) { let allZero = true; for (let h = 0; h < 24; h++) { if (!temp.schedule[h]) { allZero = false; break; } for (let c = 0; c < temp.chCount; c++) { if (temp.schedule[h][c] !== 0) { allZero = false; break; } } if (!allZero) break; } if (!allZero) localStorage.removeItem('aq_state'); } else { localStorage.removeItem('aq_state'); } } catch(e) { localStorage.removeItem('aq_state'); } }
+})();
+
+// ===== 全局状态 =====
+let defaultState = {
+    chCount:8, curTime:12, isAuto:true, fanTemp:38, fanSpeed:50, protTemp:58,
+    schedule:Array.from({length:24},()=>Array(10).fill(0)),
+    chConfig:[
+        {id:1,name:'红色',color:'#ff0000'},{id:2,name:'绿色',color:'#00cc00'},
+        {id:3,name:'蓝色',color:'#0000ff'},{id:4,name:'白色',color:'#e0e0e0'},
+        {id:5,name:'紫色395',color:'#9900cc'},{id:6,name:'暖光',color:'#ffcc00'},
+        {id:7,name:'湖光蓝',color:'#00ccff'},{id:8,name:'宝石蓝',color:'#0033cc'},
+    ]
+};
+let state = defaultState;
+let savedState = localStorage.getItem('aq_state');
+if (savedState) { try { let temp = JSON.parse(savedState); if (temp.schedule && temp.chCount) state = temp; else state = defaultState; } catch(e) { state = defaultState; } } else { state = defaultState; localStorage.setItem('aq_state', JSON.stringify(state)); }
+
+let customs = JSON.parse(localStorage.getItem('aq_customs')) || {A:null,B:null,C:null,D:null};
+let ws = null, connected = false, heartBeatTimer = null, clockTimer = null;
+let targetIP = localStorage.getItem('esp_ip') || "192.168.4.1";
+const WS_PORT = '81';
+let reconnectAttempts = 0;
+let liveBrightness = Array(10).fill(0);
+let editHour = new Date().getHours();
+let tempEditValues = Array(10).fill(0);
+for (let i=0; i<10; i++) tempEditValues[i] = 0;
+let localIP = '';
+
+// ===== 连接管理 =====
+function showToast(msg, type='normal'){ const bar = document.getElementById('connection-bar'); bar.innerText = msg; bar.className = ''; if(type==='success') bar.classList.add('connected'); if(type==='error') bar.classList.add('error'); }
+function startHeartBeat(){ if(heartBeatTimer) clearInterval(heartBeatTimer); heartBeatTimer = setInterval(()=>{ if(ws && ws.readyState===WebSocket.OPEN) ws.send('{"cmd":"PING"}'); }, 20000); }
+function startClock(hour, min, sec){ if(clockTimer) clearInterval(clockTimer); let seconds = hour*3600 + min*60 + sec; clockTimer = setInterval(()=>{ seconds = (seconds+1)%86400; let h = Math.floor(seconds/3600); let m = Math.floor((seconds%3600)/60); let s = seconds%60; document.getElementById('st-time').innerText = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`; }, 1000); }
+function connectWS(ip=null){
+    if(ip) targetIP = ip;
+    localStorage.setItem('esp_ip', targetIP);
+    document.getElementById('device-ip').value = targetIP;
+    if(ws){ ws.onopen=ws.onclose=ws.onerror=ws.onmessage=null; ws.close(); }
+    ws = new WebSocket(`ws://${targetIP}:${WS_PORT}/`);
+    ws.onopen = () => {
+        connected = true; reconnectAttempts = 0;
+        showToast('✅ 已连接 '+targetIP,'success');
+        startHeartBeat();
+        let d = new Date();
+        ws.send(JSON.stringify({cmd:'setTime', sec: d.getHours()*3600 + d.getMinutes()*60 + d.getSeconds()}));
+        readFromESP();
+    };
+    ws.onclose = () => {
+        connected = false;
+        if(heartBeatTimer) clearInterval(heartBeatTimer);
+        if(clockTimer) clearInterval(clockTimer);
+        showToast('⏳ 断开重连...','error');
+        let delay = Math.min(2000 * Math.pow(1.5, reconnectAttempts), 15000);
+        reconnectAttempts++;
+        setTimeout(()=> connectWS(), delay);
+    };
+    ws.onerror = () => {};
+    ws.onmessage = (e) => {
+        let msg = JSON.parse(e.data);
+        if(msg.cmd==='getState'){
+            state.isAuto = msg.auto;
+            state.chCount = msg.chCount || 8;
+            state.fanTemp = msg.fanTemp||38;
+            state.fanSpeed = msg.fanSpeed||50;
+            state.protTemp = msg.heatProtect||58;
+            for(let i=0;i<state.chCount;i++) liveBrightness[i] = msg.ch[i] || 0;
+            let totalSec = msg.timeSec || 0;
+            let h = Math.floor(totalSec/3600)%24;
+            let m = Math.floor((totalSec%3600)/60);
+            let s = totalSec%60;
+            startClock(h, m, s);
+            editHour = h;
+            if (state.isAuto) for (let i=0;i<state.chCount;i++) tempEditValues[i] = state.schedule[editHour][i];
+            else for (let i=0;i<state.chCount;i++) tempEditValues[i] = liveBrightness[i];
+            saveState(true);
+            renderAll();
+        }
+    };
+}
+function sendCmd(obj){ if(ws && ws.readyState===WebSocket.OPEN) ws.send(JSON.stringify(obj)); else showToast('未连接','error'); }
+
+// ===== 渲染 =====
+function renderAll(){ renderStatusPage(); renderSliderPage(); renderSystemPage(); setTimeout(drawCurveChart, 100); updateCurveLegend(); document.getElementById('auto-mode-toggle').checked = state.isAuto; document.getElementById('sys-fan-temp').value = state.fanTemp; document.getElementById('sys-fan-speed').value = state.fanSpeed; document.getElementById('sys-prot-temp').value = state.protTemp; document.getElementById('ch-count-input').value = state.chCount; updateModeLabel(); }
+function renderStatusPage(){ const g = document.getElementById('status-grid'); g.innerHTML=''; for(let i=0;i<state.chCount;i++){ let v = liveBrightness[i] !== undefined ? liveBrightness[i] : 0; g.innerHTML += `<div class="circle-item"><span>${state.chConfig[i].name}</span><div class="circle" style="border-color:${state.chConfig[i].color}">${v}</div></div>`; } }
+function renderSliderPage(){ const c = document.getElementById('controls-container'); c.innerHTML=''; document.getElementById('time-val').innerText = editHour; for(let i=0;i<state.chCount;i++){ let v = (state.isAuto) ? (tempEditValues[i] !== undefined ? tempEditValues[i] : state.schedule[editHour][i]) : liveBrightness[i]; c.innerHTML += `<div class="slider-row"><label>${state.chConfig[i].name}</label><input type="range" min="0" max="100" class="range-slider" id="slider-${i}" style="background:${state.chConfig[i].color}" value="${v}" oninput="syncVal(${i}, parseInt(this.value))"><div class="number-control"><button onclick="stepVal(${i},-1)">-</button><span id="val-${i}">${v}</span><button onclick="stepVal(${i},1)">+</button></div></div>`; } }
+function renderSystemPage(){ const c = document.getElementById('channel-name-inputs'); c.innerHTML=''; for(let i=0;i<state.chCount;i++){ c.innerHTML += `<div class="form-row"><label>通道${i+1}</label><input type="text" class="input-box" style="text-align:left;flex:1;margin:0 10px" value="${state.chConfig[i].name}" onchange="state.chConfig[${i}].name=this.value;renderAll()"><input type="color" value="${state.chConfig[i].color}" onchange="state.chConfig[${i}].color=this.value;renderAll()"></div>`; } }
+
+// ===== 高清曲线绘制（三次贝塞尔） =====
+function drawCurveChart(){
+    const canvas = document.getElementById('curveCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const container = canvas.parentElement;
+    const containerWidth = container.clientWidth - 20;
+    if (containerWidth <= 0) return;
+    const dpr = window.devicePixelRatio || 1;
+    const displayWidth = containerWidth;
+    const displayHeight = 220;
+    canvas.width = displayWidth * dpr;
+    canvas.height = displayHeight * dpr;
+    canvas.style.width = displayWidth + 'px';
+    canvas.style.height = displayHeight + 'px';
+    ctx.scale(dpr, dpr);
+
+    const w = displayWidth, h = displayHeight;
+    const margin = { top: 20, right: 20, bottom: 35, left: 40 };
+    const pw = w - margin.left - margin.right;
+    const ph = h - margin.top - margin.bottom;
+
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, w, h);
+
+    // 坐标轴
+    ctx.strokeStyle = '#ccc'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(margin.left, margin.top); ctx.lineTo(margin.left, h - margin.bottom); ctx.lineTo(w - margin.right, h - margin.bottom); ctx.stroke();
+
+    // Y轴网格
+    ctx.strokeStyle = '#eee'; ctx.setLineDash([3,3]);
+    [0,25,50,75,100].forEach(yv => {
+        const y = margin.top + ph - (yv/100)*ph;
+        ctx.beginPath(); ctx.moveTo(margin.left, y); ctx.lineTo(w - margin.right, y); ctx.stroke();
+        ctx.fillStyle = '#888'; ctx.font = '10px sans-serif'; ctx.textAlign = 'right'; ctx.fillText(yv+'%', margin.left-5, y+4);
+    });
+    ctx.setLineDash([]);
+
+    // X轴刻度 0-23
+    ctx.fillStyle = '#888'; ctx.font = '8px sans-serif'; ctx.textAlign = 'center';
+    for (let hour = 0; hour <= 23; hour++) {
+        const x = margin.left + (hour/23)*pw;
+        ctx.strokeStyle = '#ccc'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(x, h - margin.bottom); ctx.lineTo(x, h - margin.bottom+5); ctx.stroke();
+        ctx.fillText(hour, x, h - margin.bottom+18);
+    }
+
+    const pointList = [];
+    for (let ch = 0; ch < state.chCount; ch++) {
+        let pts = [];
+        for (let h = 0; h < 24; h++) {
+            let val = (state.isAuto && h === editHour) ? (tempEditValues[ch] !== undefined ? tempEditValues[ch] : state.schedule[editHour][ch]) : (state.schedule[h][ch] || 0);
+            let x = margin.left + (h / 23) * pw;
+            let y = margin.top + ph - (val / 100) * ph;
+            pts.push({x,y});
+        }
+        pointList.push(pts);
+    }
+
+    for (let ch = 0; ch < state.chCount; ch++) {
+        const color = state.chConfig[ch]?.color || '#ccc';
+        const pts = pointList[ch];
+        if(pts.length < 2) continue;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 0; i < pts.length - 1; i++) {
+            const curr = pts[i], next = pts[i+1];
+            const cpX1 = curr.x + (next.x - curr.x) / 3;
+            const cpY1 = curr.y;
+            const cpX2 = curr.x + (next.x - curr.x) * 2 / 3;
+            const cpY2 = next.y;
+            ctx.bezierCurveTo(cpX1, cpY1, cpX2, cpY2, next.x, next.y);
+        }
+        ctx.stroke();
+
+        ctx.fillStyle = '#fff';
+        for (let h = 0; h < 24; h++) {
+            let p = pts[h];
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 2.5, 0, 2*Math.PI);
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+            ctx.fill();
+        }
+    }
+}
+
+function updateCurveLegend(){ const container = document.getElementById('curveLegend'); if (!container) return; container.innerHTML = ''; for (let i = 0; i < state.chCount; i++) { const color = state.chConfig[i]?.color || '#ccc'; const name = state.chConfig[i]?.name || ('通道'+(i+1)); container.innerHTML += `<div class="legend-item"><span class="legend-color" style="background:${color}"></span>${name}</div>`; } }
+
+// ===== 交互 =====
+function syncVal(i, v){ v = Math.max(0, Math.min(100, v)); if (state.isAuto) tempEditValues[i] = v; else liveBrightness[i] = v; document.getElementById('val-'+i).innerText = v; const slider = document.getElementById('slider-'+i); if (slider) slider.value = v; drawCurveChart(); }
+function stepVal(i, d){ let cur = state.isAuto ? (tempEditValues[i] !== undefined ? tempEditValues[i] : state.schedule[editHour][i]) : liveBrightness[i]; let next = cur + d; if (next >= 0 && next <= 100) syncVal(i, next); }
+function changeTime(d){ if (state.isAuto) for (let i=0;i<state.chCount;i++) state.schedule[editHour][i] = tempEditValues[i]; editHour = (editHour + d + 24) % 24; for (let i=0;i<state.chCount;i++) tempEditValues[i] = state.schedule[editHour][i]; renderSliderPage(); drawCurveChart(); }
+function updateMode(){ state.isAuto = document.getElementById('auto-mode-toggle').checked; updateModeLabel(); sendCmd({cmd:'setMode', auto:state.isAuto}); if (state.isAuto) for (let i=0;i<state.chCount;i++) tempEditValues[i] = state.schedule[editHour][i]; renderAll(); }
+function updateModeLabel(){ let m = state.isAuto?'自动模式':'手动模式'; document.getElementById('mode-label').innerText = m; document.getElementById('st-mode').innerText = m; }
+function nav(p,el){ document.querySelectorAll('.page').forEach(x=>x.classList.remove('active')); document.getElementById('page-'+p).classList.add('active'); document.querySelectorAll('.tab-item').forEach(x=>x.classList.remove('active')); el.classList.add('active'); if (p === 'params') setTimeout(drawCurveChart, 100); }
+function saveState(silent){ state.fanTemp = document.getElementById('sys-fan-temp').value; state.fanSpeed = document.getElementById('sys-fan-speed').value; state.protTemp = document.getElementById('sys-prot-temp').value; localStorage.setItem('aq_state', JSON.stringify(state)); if(!silent) showToast('💾 已保存','success'); }
+function sendToESP(){ saveState(true); if (state.isAuto) { for (let i=0;i<state.chCount;i++) state.schedule[editHour][i] = tempEditValues[i]; let cmd = {cmd:'setFullSchedule', chCount: state.chCount, schedule: state.schedule}; sendCmd(cmd); showToast('📤 已发送完整24小时计划','success'); } else { let cmd = {cmd:'setManual'}; for(let i=0;i<state.chCount;i++) cmd['ch'+(i+1)] = liveBrightness[i]; sendCmd(cmd); showToast('📤 手动模式已发送','success'); } renderSliderPage(); drawCurveChart(); }
+function readFromESP(){ sendCmd({cmd:'getState'}); }
+function adjustPower(factor){ for(let i=0;i<state.chCount;i++){ let v = state.isAuto ? (tempEditValues[i]!==undefined?tempEditValues[i]:state.schedule[editHour][i]) : liveBrightness[i]; v = Math.min(100, Math.max(0, Math.round(v*factor))); syncVal(i, v); } renderSliderPage(); drawCurveChart(); }
+function shiftTime(delta){ let ns = Array(24).fill().map(()=>Array(10).fill(0)); for(let h=0;h<24;h++){ let src = (h-delta+24)%24; for(let c=0;c<10;c++) ns[h][c] = state.schedule[src][c]; } state.schedule = ns; saveState(true); for (let i=0;i<state.chCount;i++) tempEditValues[i] = state.schedule[editHour][i]; renderSliderPage(); sendCmd({cmd:'shiftTime',delta}); drawCurveChart(); showToast('时间挪移完成','success'); }
+function sendSystemData(){ let now = new Date(); let sec = now.getHours()*3600 + now.getMinutes()*60 + now.getSeconds(); sendCmd({cmd:'setConfig', fanTemp: parseInt(document.getElementById('sys-fan-temp').value)||38, fanSpeed: parseInt(document.getElementById('sys-fan-speed').value)||50, heatProtect: parseInt(document.getElementById('sys-prot-temp').value)||58, sec: sec}); showToast('✅ 系统设置已发送并校时','success'); }
+function applyChannelSettings(){ const input = document.getElementById('ch-count-input'); let raw = input.value.replace(/[^0-9]/g, ''); let val = parseInt(raw); if (isNaN(val)) val = 8; val = Math.max(1, Math.min(10, val)); input.value = val; state.chCount = val; while (state.chConfig.length < val) state.chConfig.push({id: state.chConfig.length+1, name: '通道'+(state.chConfig.length+1), color: '#cccccc'}); state.chConfig.length = val; for (let h=0;h<24;h++){ while(state.schedule[h].length < val) state.schedule[h].push(0); state.schedule[h].length = val; } liveBrightness = Array(10).fill(0); tempEditValues = Array(10).fill(0); saveState(true); renderAll(); if (connected) sendCmd({cmd:'setChCount', count: val}); }
+
+// ===== 手机IP 刷新 =====
+async function getLocalIP(){
+    return new Promise((resolve) => {
+        let pc = new RTCPeerConnection({ iceServers: [] });
+        pc.createDataChannel('');
+        pc.createOffer().then(offer => pc.setLocalDescription(offer));
+        pc.onicecandidate = (e) => { if(e.candidate){ let ip = /([0-9]{1,3}\.){3}[0-9]{1,3}/.exec(e.candidate.candidate); if(ip){ resolve(ip[0]); pc.close(); } } };
+        setTimeout(()=>{ resolve(null); try{pc.close()}catch(e){} }, 2000);
+    });
+}
+async function refreshLocalIP(){
+    document.getElementById('local-ip-display').innerText = '获取中...';
+    let ip = await getLocalIP();
+    if (ip) { localIP = ip; document.getElementById('local-ip-display').innerText = ip; }
+    else document.getElementById('local-ip-display').innerText = '获取失败';
+}
+
+// ===== 扫描设备 =====
+async function scanDevices(){
+    let container = document.getElementById('scan-result');
+    let baseIP = localIP || targetIP;
+    let base = baseIP.substring(0, baseIP.lastIndexOf('.')+1) || '192.168.1.';
+    container.innerHTML = `🔍 扫描 ${base}0/24 ...`;
+    let found = []; let completed = 0; let total = 253;
+    for(let start=2; start<=254; start+=10){
+        let batch = [];
+        for(let i=start; i<start+10 && i<=254; i++){
+            let ip = base + i;
+            batch.push(
+                fetch(`http://${ip}/status`, {signal: AbortSignal.timeout(2000)})
+                .then(r=>r.json()).then(d=>{ if(d.status==='ok') found.push({ip, name:d.name||'LED'}) })
+                .catch(()=>{})
+                .finally(()=>{ completed++; container.innerHTML = `🔍 ${completed}/${total} 发现${found.length}台` })
+            );
+        }
+        await Promise.allSettled(batch);
+    }
+    if (found.length === 0) container.innerHTML = '<div style="color:#888">❌ 未发现设备</div>';
+    else container.innerHTML = '<div>✅ 发现 '+found.length+' 台</div>' + found.map(d=>`<div class="scan-item" onclick="switchToDevice('${d.ip}')"><span>💡 ${d.name}</span><span style="color:#0c0">→ ${d.ip}</span></div>`).join('');
+}
+function switchToDevice(ip){ targetIP = ip; document.getElementById('device-ip').value = ip; connectWS(ip); }
+function manualConnect(){ let ip = document.getElementById('device-ip').value.trim(); if(!ip) return showToast('请输入IP','error'); connectWS(ip); }
+function sendRouterConfig(){
+    let s = document.getElementById('wifi-ssid').value, p = document.getElementById('wifi-pwd').value;
+    if(s && connected) sendCmd({cmd:'setConfig', ssid:s, pass:p}); else showToast('请填写SSID并连接设备','error');
+}
+function manualReconnect(){ connectWS(); }
+
+// 模式弹窗
+function showModal(type){
+    document.getElementById('mode-modal').style.display='flex';
+    let pBtn = document.getElementById('modal-btns-preset'); pBtn.innerHTML='';
+    let cBtn = document.getElementById('modal-btns-custom'); cBtn.innerHTML='';
+    if(type==='load'){
+        ['LPS','SPS','爆藻'].forEach(m=> pBtn.innerHTML+=`<button class="btn btn-green" style="background:#007bff;font-size:12px" onclick="loadPreset('${m}')">${m}</button>`);
+        ['A','B','C','D'].forEach(m=> cBtn.innerHTML+=`<button class="btn btn-green" style="${customs[m]?'background:#6600cc':'background:#ccc'}" onclick="loadCustom('${m}')">模式 ${m}</button>`);
+    } else {
+        ['A','B','C','D'].forEach(m=> cBtn.innerHTML+=`<button class="btn btn-green" style="background:#6600cc" onclick="saveCustom('${m}')">保存到 ${m}</button>`);
+    }
+}
+function closeModal(){ document.getElementById('mode-modal').style.display='none'; }
+function loadPreset(m){ /* 实现略 */ }
+function loadCustom(key){ /* 实现略 */ }
+function saveCustom(key){ /* 实现略 */ }
+
+window.onload = ()=>{
+    document.getElementById('device-ip').value = targetIP;
+    editHour = new Date().getHours();
+    for (let i=0;i<state.chCount;i++) tempEditValues[i] = state.schedule[editHour][i];
+    renderAll();
+    connectWS();
+};
+</script>
+</body>
 </html>
